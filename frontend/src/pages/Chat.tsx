@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../App';
-import { chatAPI } from '../api';
+import { chatAPI, papersAPI, workspaceAPI } from '../api';
 import { 
   GraduationCap, 
   LogOut, 
@@ -10,7 +10,9 @@ import {
   Bot,
   User,
   Sparkles,
-  Trash2
+  Trash2,
+  FileText,
+  CheckCircle
 } from 'lucide-react';
 
 interface Message {
@@ -19,18 +21,78 @@ interface Message {
   content: string;
 }
 
+interface Paper {
+  id: number;
+  title: string;
+  abstract: string;
+}
+
+interface Workspace {
+  id: number;
+  name: string;
+}
+
 export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: 'Hello! I\'m your AI research assistant powered by Groq Llama 3.3. You can ask me to summarize papers, compare research, or answer questions about your imported papers. How can I help you today?'
-    }
-  ]);
+  const [searchParams] = useSearchParams();
+  const workspaceId = searchParams.get('workspace');
+  
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [papers, setPapers] = useState<Paper[]>([]);
+  const [loadingContext, setLoadingContext] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const { setToken } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (workspaceId) {
+      loadWorkspaceContext();
+    } else {
+      setMessages([
+        {
+          id: '1',
+          role: 'assistant',
+          content: 'Hello! I\'m your AI research assistant powered by Groq Llama 3.3. You can ask me to summarize papers, compare research, or answer questions about your imported papers. How can I help you today?'
+        }
+      ]);
+    }
+  }, [workspaceId]);
+
+  const loadWorkspaceContext = async () => {
+    setLoadingContext(true);
+    try {
+      // Fetch workspace details
+      const workspaces = await workspaceAPI.getAll();
+      const currentWorkspace = workspaces.find((w: Workspace) => w.id === Number(workspaceId));
+      setWorkspace(currentWorkspace || null);
+
+      // Fetch papers in this workspace
+      const papersData = await papersAPI.getByWorkspace(Number(workspaceId));
+      setPapers(papersData || []);
+
+      // Set initial message with context
+      const paperTitles = papersData.map((p: Paper) => `- ${p.title}`).join('\n');
+      setMessages([
+        {
+          id: '1',
+          role: 'assistant',
+          content: `Hello! I've loaded ${papersData.length} paper${papersData.length > 1 ? 's' : ''} from the "${currentWorkspace?.name}" workspace:\n\n${paperTitles}\n\nI can help you analyze these papers, compare findings, summarize content, or answer specific questions. What would you like to know?`
+        }
+      ]);
+    } catch (err) {
+      console.error(err);
+      setMessages([
+        {
+          id: '1',
+          role: 'assistant',
+          content: 'Sorry, I had trouble loading the workspace papers. Please try again.'
+        }
+      ]);
+    } finally {
+      setLoadingContext(false);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -55,7 +117,10 @@ export default function Chat() {
     setLoading(true);
 
     try {
-      const response = await chatAPI.sendMessage(input.trim());
+      const response = await chatAPI.sendMessage(
+        input.trim(), 
+        workspaceId ? Number(workspaceId) : undefined
+      );
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -141,7 +206,7 @@ export default function Chat() {
 
       <div className="flex h-[calc(100vh-4rem)]">
         {/* Sidebar */}
-        <div className="w-64 bg-slate-800/30 border-r border-slate-700/30 p-4 hidden md:block">
+        <div className="w-64 bg-slate-800/30 border-r border-slate-700/30 p-4 hidden md:block overflow-y-auto">
           <div className="flex items-center gap-2 text-cyan-400 mb-6">
             <Sparkles className="w-5 h-5" />
             <span className="font-medium">Powered by</span>
@@ -150,6 +215,31 @@ export default function Chat() {
             <p className="text-white font-medium mb-1">Groq Llama 3.3</p>
             <p className="text-slate-400 text-xs">70B Versatile Model</p>
           </div>
+
+          {/* Workspace Context */}
+          {workspace && papers.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 text-emerald-400 mb-3">
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-sm font-medium">Context Loaded</span>
+              </div>
+              <div className="bg-slate-800/50 rounded-xl p-3 mb-3">
+                <p className="text-white text-sm font-medium mb-1">{workspace.name}</p>
+                <p className="text-slate-400 text-xs">{papers.length} papers loaded</p>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {papers.map((paper) => (
+                  <div key={paper.id} className="bg-slate-800/30 rounded-lg p-2">
+                    <div className="flex items-start gap-2">
+                      <FileText className="w-3 h-3 text-cyan-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-slate-300 text-xs line-clamp-2">{paper.title}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <button
             onClick={handleClearChat}
             className="flex items-center gap-2 w-full px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-colors"

@@ -7,6 +7,7 @@ from core.database import engine, Base
 from models.user import User
 from models.workspace import Workspace
 from models.paper import Paper
+from models.conversation import Conversation, Message
 
 # Routers
 from routers.auth import router as auth_router
@@ -29,14 +30,23 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 # Register routers
-app.include_router(auth_router)
-app.include_router(workspace_router)
-app.include_router(papers_router)
-app.include_router(chat_router)
+app.include_router(auth_router, tags=["auth"])
+app.include_router(workspace_router, prefix="/workspace", tags=["workspace"])
+app.include_router(papers_router, prefix="/papers", tags=["papers"])
+app.include_router(chat_router, tags=["chat"])
 
 
 @app.get("/")
 def root():
     return {
-        "message": "ResearchPilot AI Backend Running"
+        "message": "ResearchPilot AI Backend Running",
+        "version": "1.0.0",
+        "features": [
+            "User Authentication (JWT)",
+            "Research Paper Search (Semantic Scholar)",
+            "Workspace Management",
+            "AI Chat with Context (Groq Llama 3.3)",
+            "Vector Embeddings & Semantic Search",
+            "Conversation History"
+        ]
     }

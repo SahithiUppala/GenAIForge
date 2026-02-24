@@ -5,6 +5,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Search from './pages/Search';
 import Workspace from './pages/Workspace';
+import WorkspaceDetail from './pages/WorkspaceDetail';
 import Chat from './pages/Chat';
 
 interface AuthContextType {
@@ -51,6 +52,7 @@ function App() {
           <Route path="/dashboard" element={token ? <Dashboard /> : <Navigate to="/login" />} />
           <Route path="/search" element={token ? <Search /> : <Navigate to="/login" />} />
           <Route path="/workspace" element={token ? <Workspace /> : <Navigate to="/login" />} />
+          <Route path="/workspace/:id" element={token ? <WorkspaceDetail /> : <Navigate to="/login" />} />
           <Route path="/chat" element={token ? <Chat /> : <Navigate to="/login" />} />
           <Route path="/" element={<Navigate to={token ? "/dashboard" : "/login"} />} />
           <Route path="*" element={<Navigate to="/" />} />

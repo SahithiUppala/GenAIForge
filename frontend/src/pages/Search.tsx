@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
-import { papersAPI } from '../api';
+import { papersAPI, workspaceAPI } from '../api';
 import { 
   GraduationCap, 
   Search as SearchIcon, 
@@ -11,21 +11,53 @@ import {
   BookOpen,
   ExternalLink,
   Clock,
-  User
+  User,
+  Download,
+  Check
 } from 'lucide-react';
 
 interface Paper {
   title: string;
   abstract: string;
+  authors?: string;
+  year?: number;
+  citations?: number;
+  url?: string;
+  has_pdf?: boolean;
+}
+
+interface Workspace {
+  id: number;
+  name: string;
 }
 
 export default function Search() {
   const [query, setQuery] = useState('');
   const [papers, setPapers] = useState<Paper[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [importingIndex, setImportingIndex] = useState<number | null>(null);
+  const [importedPapers, setImportedPapers] = useState<Set<number>>(new Set());
+  const [selectedWorkspace, setSelectedWorkspace] = useState<number | null>(null);
   const { setToken } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchWorkspaces();
+  }, []);
+
+  const fetchWorkspaces = async () => {
+    try {
+      const data = await workspaceAPI.getAll();
+      setWorkspaces(data || []);
+      if (data && data.length > 0) {
+        setSelectedWorkspace(data[0].id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +65,7 @@ export default function Search() {
 
     setLoading(true);
     setSearched(true);
+    setImportedPapers(new Set());
     try {
       const data = await papersAPI.search(query);
       setPapers(data.papers || []);
@@ -41,6 +74,35 @@ export default function Search() {
       setPapers([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImportPaper = async (paper: Paper, index: number) => {
+    if (!selectedWorkspace) {
+      alert('Please select a workspace first');
+      return;
+    }
+
+    setImportingIndex(index);
+    try {
+      await papersAPI.import({
+        title: paper.title,
+        abstract: paper.abstract,
+        authors: paper.authors,
+        year: paper.year,
+        citations: paper.citations,
+        url: paper.url,
+        workspace_id: selectedWorkspace
+      });
+      
+      setImportedPapers(prev => new Set(prev).add(index));
+      setTimeout(() => {
+        setImportingIndex(null);
+      }, 1000);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to import paper');
+      setImportingIndex(null);
     }
   };
 
@@ -101,7 +163,7 @@ export default function Search() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Search Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-4">
             Search Academic Papers
           </h1>
@@ -109,6 +171,26 @@ export default function Search() {
             Find research papers from Semantic Scholar's database
           </p>
         </div>
+
+        {/* Workspace Selector */}
+        {workspaces.length > 0 && (
+          <div className="mb-6 max-w-3xl mx-auto">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Import papers to:
+            </label>
+            <select
+              value={selectedWorkspace || ''}
+              onChange={(e) => setSelectedWorkspace(Number(e.target.value))}
+              className="w-full px-4 py-2 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            >
+              {workspaces.map((ws) => (
+                <option key={ws.id} value={ws.id}>
+                  {ws.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Search Form */}
         <form onSubmit={handleSearch} className="mb-12">
@@ -156,9 +238,15 @@ export default function Search() {
                         <FileText className="w-6 h-6 text-cyan-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="text text-white mb-2 line-clamp-2">
-                         -lg font-semibold {paper.title || 'Untitled Paper'}
+                        <h3 className="text-lg font-semibold text-white mb-2 line-clamp-2">
+                          {paper.title || 'Untitled Paper'}
                         </h3>
+                        {paper.authors && (
+                          <p className="text-sm text-slate-400 mb-2">
+                            <User className="w-3 h-3 inline mr-1" />
+                            {paper.authors}
+                          </p>
+                        )}
                         {paper.abstract && (
                           <p className="text-slate-400 text-sm mb-4 line-clamp-3">
                             {paper.abstract}
@@ -169,15 +257,49 @@ export default function Search() {
                             <BookOpen className="w-3 h-3" />
                             Semantic Scholar
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            Recent
-                          </span>
+                          {paper.year && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {paper.year}
+                            </span>
+                          )}
+                          {paper.citations !== undefined && (
+                            <span>{paper.citations} citations</span>
+                          )}
                         </div>
                       </div>
-                      <button className="p-2 text-slate-400 hover:text-cyan-400 transition-colors flex-shrink-0">
-                        <ExternalLink className="w-5 h-5" />
-                      </button>
+                      <div className="flex gap-2 flex-shrink-0">
+                        {paper.url && (
+                          <a
+                            href={paper.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-sm font-medium rounded-lg transition-all flex items-center gap-2"
+                            title={paper.has_pdf ? "Open PDF" : "View on Semantic Scholar"}
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            {paper.has_pdf ? 'Open PDF' : 'View Paper'}
+                          </a>
+                        )}
+                        <button
+                          onClick={() => handleImportPaper(paper, index)}
+                          disabled={importingIndex === index || importedPapers.has(index)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            importedPapers.has(index)
+                              ? 'bg-green-500/20 text-green-400'
+                              : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30'
+                          } disabled:opacity-50`}
+                          title={importedPapers.has(index) ? "Imported" : "Import to workspace"}
+                        >
+                          {importingIndex === index ? (
+                            <div className="w-5 h-5 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin"></div>
+                          ) : importedPapers.has(index) ? (
+                            <Check className="w-5 h-5" />
+                          ) : (
+                            <Download className="w-5 h-5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

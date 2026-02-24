@@ -166,24 +166,24 @@ export default function Workspace() {
           ) : workspaces.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {workspaces.map((workspace) => (
-                <div
+                <Link
                   key={workspace.id}
-                  className="group bg-slate-800/30 border border-slate-700/30 rounded-xl p-5 hover:border-slate-600/50 transition-all"
+                  to={`/workspace/${workspace.id}`}
+                  className="group bg-slate-800/30 border border-slate-700/30 rounded-xl p-5 hover:border-slate-600/50 transition-all cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="w-12 h-12 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl flex items-center justify-center">
                       <Folder className="w-6 h-6 text-purple-400" />
                     </div>
-                    <button className="p-1 text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <MoreVertical className="w-5 h-5" />
-                    </button>
                   </div>
-                  <h3 className="text-lg font-medium text-white mb-2">{workspace.name}</h3>
+                  <h3 className="text-lg font-medium text-white mb-2 group-hover:text-cyan-400 transition-colors">
+                    {workspace.name}
+                  </h3>
                   <div className="flex items-center gap-2 text-xs text-slate-500">
                     <Clock className="w-3 h-3" />
-                    <span>Created recently</span>
+                    <span>Click to view papers</span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (

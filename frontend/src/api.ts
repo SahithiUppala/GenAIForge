@@ -61,12 +61,52 @@ export const papersAPI = {
     const response = await api.get(`/papers/search?query=${encodeURIComponent(query)}`);
     return response.data;
   },
+  
+  import: async (paperData: any) => {
+    const response = await api.post('/papers/import', paperData);
+    return response.data;
+  },
+  
+  getByWorkspace: async (workspaceId: number) => {
+    const response = await api.get(`/papers/workspace/${workspaceId}`);
+    return response.data;
+  },
+  
+  getWorkspacePapers: async (workspaceId: number) => {
+    const response = await api.get(`/papers/workspace/${workspaceId}`);
+    return response.data;
+  },
+  
+  delete: async (paperId: number) => {
+    const response = await api.delete(`/papers/${paperId}`);
+    return response.data;
+  },
 };
 
 // Chat API
 export const chatAPI = {
-  sendMessage: async (message: string) => {
-    const response = await api.post('/chat', { content: message });
+  sendMessage: async (message: string, workspaceId?: number, conversationId?: number) => {
+    const params = new URLSearchParams();
+    if (workspaceId) params.append('workspace_id', workspaceId.toString());
+    if (conversationId) params.append('conversation_id', conversationId.toString());
+    
+    const url = `/chat?${params.toString()}`;
+    const response = await api.post(url, { content: message });
+    return response.data;
+  },
+  
+  getConversations: async () => {
+    const response = await api.get('/conversations');
+    return response.data;
+  },
+  
+  getMessages: async (conversationId: number) => {
+    const response = await api.get(`/conversation/${conversationId}/messages`);
+    return response.data;
+  },
+  
+  deleteConversation: async (conversationId: number) => {
+    const response = await api.delete(`/conversation/${conversationId}`);
     return response.data;
   },
 };
